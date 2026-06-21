@@ -13,6 +13,7 @@ namespace TG_Program
         bool moving = false;
         bool creatingEdge = false;
         bool djisktra = false;
+        bool appLocked = false;
 
 
         public Form1()
@@ -23,8 +24,14 @@ namespace TG_Program
 
         private void OnNewHranaInitiated(Vrchol iniciator)
         {
-            creatingEdge = true;
-            this.vrchol1 = iniciator;
+            if (appLocked)
+                return;
+            if (!moving)
+            {
+                creatingEdge = true;
+                this.vrchol1 = iniciator;
+            }
+
 
         }
 
@@ -40,11 +47,23 @@ namespace TG_Program
         }
         public void OnVrcholClicked(Vrchol vrchol)
         {
+            if (appLocked)
+                return;
             if (creatingEdge)
             {
                 if (vrchol != vrchol1)
                 {
-                    int vaha = Prompt.ShowDialog();
+                    int vaha = 0;
+                    if (checkBox1.Checked == true)
+                    {
+                        Random random = new Random();
+                        vaha = random.Next(1, 10);
+                    }
+                    else
+                    {
+                        vaha = Prompt.ShowDialog();
+                    }
+
                     Hrana hrana = new Hrana(vrchol1, vrchol, vaha);
                     hrany.Add(hrana);
                     DrawHrany();
@@ -166,6 +185,7 @@ namespace TG_Program
         {
             SolidBrush brush = new SolidBrush(panel1.BackColor);
             g.FillRectangle(brush, 0, 0, panel1.Width, panel1.Height);
+
             List<Control> controlsToRemove = new List<Control>();
             foreach (Control control in panel1.Controls)
             {
@@ -174,12 +194,11 @@ namespace TG_Program
                     controlsToRemove.Add(control);
                 }
             }
-            foreach (Control control in panel1.Controls)
+
+            foreach (Control control in controlsToRemove)
             {
-                if (controlsToRemove.Contains(control))
-                {
-                    panel1.Controls.Remove(control);
-                }
+                panel1.Controls.Remove(control);
+                control.Dispose(); // uvolní i zdroje labelu
             }
         }
 
@@ -224,7 +243,9 @@ namespace TG_Program
         }
         void RunDjisktra()
         {
-         
+            if (appLocked)
+                return;
+            appLocked = true;
             if (hrany.Any(h => h.vaha < 0))
             {
                 MessageBox.Show("Dijkstra nefunguje se zápornými vahami.");
@@ -239,6 +260,7 @@ namespace TG_Program
             {
                 vzdalenost[v] = int.MaxValue;
                 predchozi[v] = null;
+                v.BackColor = Color.LightGray; // nezpracovaný
             }
 
             vzdalenost[vrchol1] = 0;
@@ -260,10 +282,16 @@ namespace TG_Program
                 if (aktualni == null || minVzdalenost == int.MaxValue)
                     break;
 
+                aktualni.BackColor = Color.Gold; // právě vybraný
+                Cekej(500);
+
                 nezpracovane.Remove(aktualni);
 
                 if (aktualni == vrchol2)
+                {
+                    aktualni.BackColor = Color.LimeGreen;
                     break;
+                }
 
                 foreach (var hrana in hrany)
                 {
@@ -280,13 +308,22 @@ namespace TG_Program
                     if (!nezpracovane.Contains(soused))
                         continue;
 
+                    Color puvodniBarva = soused.BackColor;
+                    soused.BackColor = Color.LightSkyBlue;
+                    Cekej(200);
+
                     long novaVzdalenostLong = (long)vzdalenost[aktualni] + hrana.vaha;
                     if (novaVzdalenostLong < vzdalenost[soused])
                     {
                         vzdalenost[soused] = (int)novaVzdalenostLong;
                         predchozi[soused] = aktualni;
                     }
+
+                    soused.BackColor = puvodniBarva;
                 }
+
+                aktualni.BackColor = Color.SeaGreen; // zpracováno
+                Cekej(300);
             }
 
             if (vzdalenost[vrchol2] == int.MaxValue)
@@ -307,11 +344,33 @@ namespace TG_Program
 
             cesta.Reverse();
 
+            foreach (var v in cesta)
+                v.BackColor = Color.Red;
+
             string textCesty = string.Join(" -> ", cesta.Select(v => "V" + v.id));
             MessageBox.Show($"Nejkratší cesta: {textCesty}\nDélka: {vzdalenost[vrchol2]}");
+            appLocked = false;
+        }
 
 
+        void Cekej(int ms)
+        {
+            DateTime konec = DateTime.Now.AddMilliseconds(ms);
+            while (DateTime.Now < konec)
+            {
+                Application.DoEvents();
+            }
+        }
 
+        private void button3_Click(object sender, EventArgs e)
+        {
+            if (appLocked)
+                return;
+
+            foreach(var vrchol in vrcholy)
+            {
+                vrchol.BackColor = Color.SkyBlue;
+            }
         }
     }
 }
